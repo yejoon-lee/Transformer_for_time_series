@@ -9,7 +9,7 @@ from .embedding import ConvTSEmbedding, WavenetTSEmbedding, FixedPositionEmbeddi
 
 
 class Transformer_fcst(nn.Module):
-    r'''Transformer(Encoder-decoder) for time series forecasting.
+    '''Transformer(Encoder-decoder) for time series forecasting.
 
     Point forecast (fcst_mode = 'point')
         Point forecast which directly predicts the time series value.
@@ -96,7 +96,7 @@ class Transformer_fcst(nn.Module):
                 nn.Linear(d_ff, 1)
             )
 
-        elif self.fcst_mode == 'gauss':
+        else:
             self.mean_layer = nn.Sequential(  # (N, seq_len, embedding_dim)
                 nn.Linear(embedding_dim, d_ff),  # (N, seq_len, d_ff)
                 nn.Dropout(dropout_rate),

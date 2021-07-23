@@ -1,5 +1,14 @@
 import numpy as np
 
+def make_input_target(data, src_len, tgt_len):
+    assert data.shape[1] == src_len + tgt_len, "seq_len == src_len + tgt_len should be satisfied. seq_len is expected to be axis=1"
+    # input: (N, seq_len-1, ...), target: (N, tgt_Len, ...)
+    return data[:, :-1, ...], data[:, -tgt_len:, ...]
+
+def make_src_tgt(input, src_len, tgt_len):
+    assert input.shape[1] == src_len + tgt_len - 1, "seq_len == src_len + tgt_len - 1 should be satisfied. seq_len is expected to be axis=1"
+    return input[:, :src_len, ...], input[:, src_len-1:, ...]  # src: (N, S, ...), tgt: (N, T, 1)
+
 
 def preprocess_seq(data, index):
     '''

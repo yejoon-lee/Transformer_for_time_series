@@ -1,24 +1,29 @@
-
 import torch
 import torch.nn as nn
-from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm
 import wandb
 
-from tools.train import EarlyStopping
+from tools.preprocess import make_input_target, make_src_tgt
+from tools.train import EarlyStopping, make_loader
 from tools.create_synthetic import create_multi
 from model.model import Transformer_fcst
 
 
 class RunSynthetic:
-    def __init__(self, project_name, config, checkpoint_path='_model_pkls', verbose=2):
-        self.device = torch.device(
-            "cuda:0" if torch.cuda.is_available() else "cpu")
+    '''Run for synthetic data using wandb.
+    Methods:
+        'make' and 'train' are the major funtions which are called in __init__. Others are supplementary.
+    '''
+    def __init__(self, project_name:str, config:dict, run_name=None, checkpoint_path='_model_pkls', verbose=2):
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.verbose = verbose
         
         wandb.login()
         with wandb.init(project=project_name, config=config):
             config = wandb.config
+            if run_name:
+                wandb.run.name = run_name
+
             self.make(config)
             self.train(config, checkpoint_path)
 
@@ -28,12 +33,12 @@ class RunSynthetic:
         val = create_multi(500, config.t0)
 
         # dloader
-        self.src_len, self.tgt_len = config.t0, 23
+        self.src_len, self.tgt_len = config.t0, 24
 
-        input, target = self.make_src_tgt(train, self.src_len, self.tgt_len)
-        self.train_dloader = self.make_loader(input, target, config.batch_size)
-        input, target = self.make_src_tgt(val, self.src_len, self.tgt_len)
-        self.val_dloader = self.make_loader(input, target, config.batch_size)
+        input, target = make_input_target(train, self.src_len, self.tgt_len)
+        self.train_dloader = make_loader(input, target, config.batch_size)
+        input, target = make_input_target(val, self.src_len, self.tgt_len)
+        self.val_dloader = make_loader(input, target, config.batch_size)
 
         # model
         self.model = Transformer_fcst(fcst_mode='gauss',
@@ -56,11 +61,11 @@ class RunSynthetic:
             patience=config.es_patience, verbose=self.verbose)
 
     def train(self, config, checkpoint_path):
-        wandb.watch(self.model, self.criterion,
-                    log='all', log_freq=config.batch_size)
+        print('Start training')
+        wandb.watch(self.model, self.criterion, log='all', log_freq=config.batch_size)
 
         # verbose setting (whether to use tqdm)
-        to_iter = tqdm(self.train_dloader) if self.verbose else self.train_dloader
+        train_dloader_ = tqdm(self.train_dloader) if self.verbose else self.train_dloader
 
         # epoch loop
         for epoch in range(config.n_epoch):
@@ -69,7 +74,7 @@ class RunSynthetic:
             running_train_loss = 0.0
             running_train_metric = 0.0
 
-            for input, target in to_iter:
+            for input, target in train_dloader_:
                 loss, metric = self.train_eval_batch(input, target)
                 running_train_loss += loss
                 running_train_metric += metric
@@ -97,48 +102,38 @@ class RunSynthetic:
 
             # verbose setting (whether to print progress)
             if self.verbose > 1:
-                print(f'[Epoch {epoch+1}] Train loss:',
-                      f'{train_loss:.4f}', end=' ')
+                print(f'[Epoch {epoch+1}] Train loss:', f'{train_loss:.4f}', end=' ')
                 print('Val loss:', f'{val_loss:.4f}')
 
-            # early stoppingc
+            # early stopping
             self.earlystopping(val_loss, self.model, checkpoint_path)
             if self.earlystopping.early_stop:
-                print('Early Stopping')
-                self.model.load_state_dict(torch.load(
-                    checkpoint_path+'/checkpoint.pth'))
+                self.model.load_state_dict(torch.load(checkpoint_path+'/checkpoint.pth'))
                 break
 
         # export as onnx
-        src, tgt = input[:, :self.src_len, ...].to(
-            self.device), input[:, self.src_len:, ...].to(self.device)
+        input = input.to(self.device)
+        src, tgt = make_src_tgt(input, self.src_len, self.tgt_len)
         torch.onnx.export(self.model, (src, tgt), "model.onnx")
         wandb.save("model.onnx")
 
+        print('Finish training')
+
+
     def train_eval_batch(self, input, target):
-        # get source and target
+        # get src and tgt
         input, target = input.to(self.device), target.to(self.device)
-        src, tgt = input[:, :self.src_len, ...], input[:, self.src_len:, ...]
+        src, tgt = make_src_tgt(input, self.src_len, self.tgt_len)
 
         # forward
         mean, var = self.model(src, tgt)
         loss = self.criterion(mean, target, var)
         metric = self.metric_func(mean, target)
 
-        # backward if necessary
+        # backward if training (not exectued in eval)
         if self.model.training:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
 
         return loss.item(), metric.item()
-
-    def make_src_tgt(self, data, src_len, tgt_len):
-        assert data.shape[1] == src_len + tgt_len + \
-            1, "seq_len == self.src_len +self. tgt_len + 1 should be satisfied."
-        return data[:, :-1, ...], data[:, -tgt_len:, ...]
-
-    def make_loader(self, input, target, batch_size):
-        dset = TensorDataset(torch.Tensor(input), torch.Tensor(target))
-        dloader = DataLoader(dset, shuffle=True, batch_size=batch_size)
-        return dloader

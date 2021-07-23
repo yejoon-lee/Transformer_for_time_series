@@ -1,7 +1,6 @@
 __pycache__
 *.vscode
 *.onnx
-_model_pkls
 _plots
 wandb
 data_coin

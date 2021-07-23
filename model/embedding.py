@@ -35,7 +35,7 @@ class ConvTSEmbedding(nn.Module):
     Causal convolutional embedding for time series value.
     Convolutions are only applied to the left. (causal convolution)
     '''
-    def __init__(self, embedding_dim, kernel_size, conv_depth=4, input_channel=1):
+    def __init__(self, embedding_dim, kernel_size=3, conv_depth=4, input_channel=1):
         super(ConvTSEmbedding, self).__init__()
 
         self.fc = nn.Linear(input_channel, embedding_dim)
