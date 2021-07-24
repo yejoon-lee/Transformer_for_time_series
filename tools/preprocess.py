@@ -2,8 +2,7 @@ import numpy as np
 
 def make_input_target(data, src_len, tgt_len):
     assert data.shape[1] == src_len + tgt_len, "seq_len == src_len + tgt_len should be satisfied. seq_len is expected to be axis=1"
-    # input: (N, seq_len-1, ...), target: (N, tgt_Len, ...)
-    return data[:, :-1, ...], data[:, -tgt_len:, ...]
+    return data[:, :-1, ...], data[:, -tgt_len:, ...] # input: (N, seq_Len-1, ...), target: (N, tgt_Len, ...)
 
 def make_src_tgt(input, src_len, tgt_len):
     assert input.shape[1] == src_len + tgt_len - 1, "seq_len == src_len + tgt_len - 1 should be satisfied. seq_len is expected to be axis=1"
@@ -27,26 +26,6 @@ def preprocess_seq(data, index):
     # reshape
     input = np.expand_dims(z, -1)  # input.shape == (N, seq_len, 1)
     target = np.expand_dims(target, -1)  # target.shape == (N, seq_len, 1)
-
-    return input, target
-
-def preprocess_seq_with_cov(data):
-    '''
-    Given whole seq, return input(z) and target.
-    Args:
-        data: 3D array; (n_sample, seq_len, n_features)
-    '''
-    # original seq and shifted seq
-    data_org = data[:, :-1, :]  # from 0 to t-1
-    data_shifted = data[:, 1:, :]  # from 1 to t
-
-    # indexing from axis = -1
-    z = data_org[:, :, 0:1]  # z.shape == (N, seq_len)
-    cov = data_shifted[:, :, 1:]
-    target = data_shifted[:, :, 0:1]  # target.shape == (N, seq_len)
-
-    # reshape
-    input = np.concatenate((z,cov), -1)
 
     return input, target
 

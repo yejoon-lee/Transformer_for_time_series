@@ -3,9 +3,9 @@ import torch
 from torch.utils.data import TensorDataset, DataLoader
 
 
-def make_loader(input, target, batch_size):
+def make_loader(input, target, batch_size, shuffle=True):
     dset = TensorDataset(torch.Tensor(input), torch.Tensor(target))
-    dloader = DataLoader(dset, shuffle=True, batch_size=batch_size)
+    dloader = DataLoader(dset, shuffle=shuffle, batch_size=batch_size)
     return dloader
 
 
