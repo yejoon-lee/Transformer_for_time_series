@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
 def create_multi(sample_num, t0):
     y = np.zeros((sample_num, t0+24, 1))

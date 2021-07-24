@@ -1,18 +1,9 @@
-import matplotlib
-from matplotlib.pyplot import axis
 import seaborn as sns
 sns.set_style('darkgrid')
 import numpy as np
 import torch
 import torch.nn as nn
 
-
-def get_stats(samples, quantile):
-    lbound = np.quantile(samples, 0.5 - quantile/2)
-    median = np.quantile(samples, 0.5)
-    ubound = np.quantile(samples, 0.5 + quantile/2)
-    return lbound, median, ubound
-    
 
 class InferShortTerm:
     '''Short-term forecasting (i.e. rolling prediction)
@@ -23,14 +14,16 @@ class InferShortTerm:
 
     def forward(self, 
                 input : tuple):
-        '''input: ((N, S, 1), (N, T, 1))
+        '''Vanilla forward of self.model
+        Args:
+            input: ((N, S, 1), (N, T, 1))
         '''
         # source and target
         src, tgt = input
         # forward
         mean, var = self.model(src, tgt)
         # to numpy
-        return mean, var
+        return mean, var # (N, T, 1), (N, T, 1)
 
     def eval(self, 
              input : tuple, 
@@ -41,6 +34,12 @@ class InferShortTerm:
         Args:
             input: ((N, S, 1), (N, T, 1))
             target: (N, T, 1)
+            criterion: loss function for eval
+            metric: supplementary metric function for eval
+
+        Help:
+            1. input and target should be torch.Tensor whose device is same to self.model
+            2. Use `with torch.no_grad():`   
         '''
         mean, var= self.forward(input) # (N, T, 1), (N, T, 1)
         loss = criterion(mean, target, var)
@@ -112,43 +111,62 @@ class InferShortTerm:
         # plot
         ax.plot(self.x_axis, truth, label='ground truth')
         ax.plot(self.x_axis[-len(medians):], medians, label='forecast')
-        ax.fill_between(self.x_axis[-len(medians):], lbounds, ubounds, alpha=0.3)
+        ax.fill_between(self.x_axis[-len(medians):], lbounds, ubounds, alpha=0.3, color='orange')
         ax.legend()
 
 
-
-class InferLongTerm():
+class InferLongTerm(InferShortTerm):
     '''Long-term forecasting using random sampling.
-    Args:
+
+    Inherit InferShortTerm, only overriding the forward method.
     '''
-    def __init__(self, model, beam_width):
-        self.model = model
-        self.beam_width = beam_width
+    def forward(self, 
+                input : tuple,
+                num_draw : int = 10):
+        '''Forward of self.model with recurrence. 
+        For tgt, input of t+1_step is the output of t_step. 
+        In other words, model is only provided with first token in tgt. 
 
-    def forward(self, input:tuple):
-        '''
-        Args
+        Args:
             input: ((N, S, 1), (N, T, 1))
-            target: (N, T, 1)
+            num_draw: Numbers drawing samples from probability distribution when deciding
+            input of t+1_step (scalar) with output of t_step (mean and variance).
         '''
-        # src and tgt
-        src, tgt = input
-        tgt[:, 1:, :] = 0 # mask out except for the first token in each seq        
-        # forecast
-        final_mean = torch.zeros(tgt.shape)
-        final_var = torch.zeros(tgt.shape)
+        # unpack input
+        src, tgt = input  # (N, S, 1), (N, T, 1)
 
-        for i in range(tgt.shape[1] - 1):
-            # model forward
-            output_mean, output_var = self.model(src, tgt)
-            mean = output_mean[:, i, :] # (N, 1)
-            var = output_var[:, i, :] # (N, 1)
+        # store mean and var for n_draw times
+        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        drawn_mean = torch.zeros(num_draw, *list(tgt.shape), device=device) # (n_draw, N, T, 1)
+        drawn_var = torch.zeros(num_draw, *list(tgt.shape), device=device)  # (n_draw, N, T, 1)
 
-            # append in final forecast value
-            final_mean[:, i, :] = mean
-            final_var[:, i, :] = var
+        for i in range(num_draw):
+            # mask out except for the first token in each seq
+            tgt[:, 1:, :] = 0  
 
-            # sampled_ts = sample(mean, var) # (N, 1)
-            # tgt[:, i+1, :] = sampled_ts
+            for j in range(tgt.shape[1] - 1): # iter within seq
+                # model forward
+                output_mean, output_var = self.model(src, tgt) # (N, T, 1), (N, T, 1)
+                mean = output_mean[:, j, :] # (N, 1)
+                var = output_var[:, j, :] # (N, 1)
+
+                # append in final forecast value
+                drawn_mean[i ,:, j, :] = mean
+                drawn_var[i, :, j, :] = var
+
+                # sample from given distribution and append in tgt
+                sampled_ts = torch.normal(mean, var) # (N, 1)
+                tgt[:, j+1, :] = sampled_ts
+
+        # get median of draws
+        median_mean = torch.quantile(drawn_mean, 0.5, dim=0) # (N, T, 1)
+        median_var =torch.quantile(drawn_var, 0.5, dim=0) # (N, T, 1)
+
+        return median_mean, median_var
 
 
+def get_stats(samples, quantile):
+    lbound = np.quantile(samples, 0.5 - quantile/2)
+    median = np.quantile(samples, 0.5)
+    ubound = np.quantile(samples, 0.5 + quantile/2)
+    return lbound, median, ubound
