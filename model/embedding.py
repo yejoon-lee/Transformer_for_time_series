@@ -65,7 +65,7 @@ class LearnedPositionEmbedding(nn.Module):
 
         self.register_buffer('pos_tensor', pos_tensor)
 
-    def forward(self, x): # x.shape == (N, ??, ??)
+    def forward(self, x): # x.shape == (N, ...)
         pos_embedded = self.pos_embedding(self.pos_tensor) # pos_embedded.shape == (seq_len, embedding_dim)
         return pos_embedded.repeat(x.shape[0], 1, 1) # (N, seq_len, embedding_dikm)
 
@@ -92,5 +92,5 @@ class FixedPositionEmbedding(nn.Module):
 
         self.register_buffer('pos_embedding', pos_embedding)
 
-    def forward(self, x): # (N, ??, ??)
+    def forward(self, x): # (N, ...)
         return self.pos_embedding.repeat(x.shape[0], 1, 1) # (N, seq_len, embedding_dim)

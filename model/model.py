@@ -39,6 +39,7 @@ class Transformer_fcst(nn.Module):
                        nhead : int, 
                        num_layers : tuple, 
                        device, 
+                       input_dim : int = 1,
                        ts_embed='wavenet',
                        pos_embed='learned',
                        d_ff=512, 
@@ -64,8 +65,8 @@ class Transformer_fcst(nn.Module):
         # input
         ## time series embedding
         ts_embed_func = ConvTSEmbedding if ts_embed == 'conv' else WavenetTSEmbedding
-        self.src_ts_embedding = ts_embed_func(embedding_dim=embedding_dim, **embedding_args)
-        self.tgt_ts_embedding = ts_embed_func(embedding_dim=embedding_dim, **embedding_args)
+        self.src_ts_embedding = ts_embed_func(embedding_dim=embedding_dim, input_channel=input_dim, **embedding_args)
+        self.tgt_ts_embedding = ts_embed_func(embedding_dim=embedding_dim, input_channel=input_dim, **embedding_args)
 
         ## position embedding   
         pos_embed_func = FixedPositionEmbedding if pos_embed == 'fixed' else LearnedPositionEmbedding
@@ -115,7 +116,13 @@ class Transformer_fcst(nn.Module):
 
 
 
-    def forward(self, src, tgt): # src.shape == (N, S, 1), tgt.shape == (N, T, 1)
+    def forward(self, src, tgt): 
+        '''src.shape == (N, S, dim), tgt.shape == (N, T, dim)
+        'dim' could be any intger, but usually dim = 1 in time series setting.
+        '''
+        # shape check
+        assert src.dim() == 3 & tgt.dim() == 3, "src and tgt should be 3-dimensional"
+
         # input
         ## timeseries embedding
         src_ts_embedded = self.src_ts_embedding(src)  # (N, S, embedding_dim)

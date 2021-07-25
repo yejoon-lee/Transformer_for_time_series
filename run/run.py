@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
+import numpy as np
+from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import wandb
 
-from tools.preprocess import make_input_target, make_src_tgt
+from tools.preprocess import make_input_target, make_src_tgt, cut_seq
 from tools.train import EarlyStopping, make_loader
 from tools.create_synthetic import create_multi
 from model.model import Transformer_fcst
@@ -11,10 +13,14 @@ from model.model import Transformer_fcst
 
 class RunSynthetic:
     '''Run for synthetic data using wandb.
-    Methods:
-        'make' and 'train' are the major funtions which are called in __init__. Others are supplementary.
+    'make' and 'train' are the methods called in __init__. Others are supplementary.
     '''
-    def __init__(self, project_name:str, config:dict, run_name=None, checkpoint_path='_model_pkls', verbose=2):
+    def __init__(self, 
+                project_name : str, 
+                config : dict, 
+                run_name : str = None, 
+                checkpoint_path = '_model_pkls/checkpoint.pth', 
+                verbose = 2):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.verbose = verbose
         
@@ -29,11 +35,10 @@ class RunSynthetic:
 
     def make(self, config):
         # load data
-        train = create_multi(4500, config.t0)
-        val = create_multi(500, config.t0)
+        train, val = self.load_data(config) # train, val : (N, seq_len, input_dim)
 
         # dloader
-        self.src_len, self.tgt_len = config.t0, 24
+        self.src_len, self.tgt_len = config.src_len, config.tgt_len
 
         input, target = make_input_target(train, self.src_len, self.tgt_len)
         self.train_dloader = make_loader(input, target, config.batch_size)
@@ -47,6 +52,7 @@ class RunSynthetic:
                                       nhead=config.nhead,
                                       num_layers=config.num_layers,
                                       device=self.device,
+                                      input_dim=train.shape[-1],
                                       ts_embed=config.ts_embed,
                                       pos_embed=config.pos_embed).to(self.device)
 
@@ -108,7 +114,7 @@ class RunSynthetic:
             # early stopping
             self.earlystopping(val_loss, self.model, checkpoint_path)
             if self.earlystopping.early_stop:
-                self.model.load_state_dict(torch.load(checkpoint_path+'/checkpoint.pth'))
+                self.model.load_state_dict(torch.load(checkpoint_path))
                 break
 
         # export as onnx
@@ -119,8 +125,18 @@ class RunSynthetic:
 
         print('Finish training')
 
+    def load_data(self, config):
+        '''This method should return train and val data.
+        Size of each should be (N, src_len + tgt_len, ...)
+        '''
+        train = create_multi(4500, config.src_len, config.tgt_len)
+        val = create_multi(500, config.src_len, config.tgt_len)
+        return train, val
 
     def train_eval_batch(self, input, target):
+        '''This method should return loss value and metric value.
+        Datatype of each should be float.
+        '''
         # get src and tgt
         input, target = input.to(self.device), target.to(self.device)
         src, tgt = make_src_tgt(input, self.src_len, self.tgt_len)
@@ -137,3 +153,32 @@ class RunSynthetic:
             self.optimizer.step()
 
         return loss.item(), metric.item()
+
+
+
+class RunCoin(RunSynthetic):
+    '''Run for coin data using wandb.
+    Inherit RunSynthetic, only overriding load_data
+    '''
+    def load_data(self, config):
+        # load data
+        data = np.load('./data_coin/train.npy')
+        if config.run_quick:
+            idx = np.random.randint(data.shape[0], size=1000)
+            data = data[idx, ...]
+
+        # only get the open price from various features
+        data = data[:, :, 1:2]  # (*, seq_len, 1)
+
+        # return-ize?
+
+        # split into train and val
+        train, val = train_test_split(data, train_size=0.8)
+
+        # cut seq (create training instances)
+        train = cut_seq(train, window_len=config.window_len,
+                        stride=config.stride)  # (N, window_len, 1)
+        val = cut_seq(val, window_len=config.window_len,
+                      stride=config.stride)  # (N, window_len, 1)
+
+        return train, val

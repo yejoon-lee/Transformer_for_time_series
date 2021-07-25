@@ -4,13 +4,15 @@ from torch.utils.data import TensorDataset, DataLoader
 
 
 def make_loader(input, target, batch_size, shuffle=True):
+    '''Make dataloder for pyTorch.
+    '''
     dset = TensorDataset(torch.Tensor(input), torch.Tensor(target))
     dloader = DataLoader(dset, shuffle=shuffle, batch_size=batch_size)
     return dloader
 
 
 class EarlyStopping:
-    def __init__(self, patience=7, verbose=0, delta=0):
+    def __init__(self, patience, verbose=0, delta=0):
         self.patience = patience
         self.verbose = verbose
         self.counter = 0
@@ -36,5 +38,5 @@ class EarlyStopping:
             self.counter = 0
 
     def save_checkpoint(self, val_loss, model, path):
-        torch.save(model.state_dict(), path+'/'+'checkpoint.pth')
+        torch.save(model.state_dict(), path)
         self.val_loss_min = val_loss

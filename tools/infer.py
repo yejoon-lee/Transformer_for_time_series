@@ -144,7 +144,7 @@ class InferLongTerm(InferShortTerm):
             # mask out except for the first token in each seq
             tgt[:, 1:, :] = 0  
 
-            for j in range(tgt.shape[1] - 1): # iter within seq
+            for j in range(tgt.shape[1]): # iter within seq
                 # model forward
                 output_mean, output_var = self.model(src, tgt) # (N, T, 1), (N, T, 1)
                 mean = output_mean[:, j, :] # (N, 1)
@@ -154,9 +154,10 @@ class InferLongTerm(InferShortTerm):
                 drawn_mean[i ,:, j, :] = mean
                 drawn_var[i, :, j, :] = var
 
-                # sample from given distribution and append in tgt
-                sampled_ts = torch.normal(mean, var) # (N, 1)
-                tgt[:, j+1, :] = sampled_ts
+                # sample from given distribution and append in tgt; not executed in last iter
+                if j < tgt.shape[1] - 1:
+                    sampled_ts = torch.normal(mean, var) # (N, 1)
+                    tgt[:, j+1, :] = sampled_ts
 
         # get median of draws
         median_mean = torch.quantile(drawn_mean, 0.5, dim=0) # (N, T, 1)
