@@ -1,6 +1,9 @@
 __pycache__
 *.vscode
 *.onnx
+*.yaml
 _plots
+_notebooks_for-coin
 wandb
 data_coin
+draft.py

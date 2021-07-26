@@ -13,17 +13,22 @@ from model.model import Transformer_fcst
 
 class RunSynthetic:
     '''Run for synthetic data using wandb.
-    'make' and 'train' are the methods called in __init__. Others are supplementary.
+    'make' and 'train' are the main methods called in __init__. Others are supplementary.
+
+    You will be requried to provide API key in the first run. You need to register to Weight & Biases (wandb)
+    in order to receive API key. 
     '''
     def __init__(self, 
                 project_name : str, 
                 config : dict, 
                 run_name : str = None, 
-                checkpoint_path = '_model_pkls/checkpoint.pth', 
-                verbose = 2):
+                checkpoint_path = '.', 
+                verbose = 2,
+                watch : bool = False):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.verbose = verbose
-        
+        self.watch = watch
+
         wandb.login()
         with wandb.init(project=project_name, config=config):
             config = wandb.config
@@ -31,7 +36,7 @@ class RunSynthetic:
                 wandb.run.name = run_name
 
             self.make(config)
-            self.train(config, checkpoint_path)
+            self.train(config, checkpoint_path + f'/{project_name}_{wandb.run.name}.pth')
 
     def make(self, config):
         # load data
@@ -68,10 +73,8 @@ class RunSynthetic:
 
     def train(self, config, checkpoint_path):
         print('Start training')
-        wandb.watch(self.model, self.criterion, log='all', log_freq=config.batch_size)
-
-        # verbose setting (whether to use tqdm)
-        train_dloader_ = tqdm(self.train_dloader) if self.verbose else self.train_dloader
+        if self.watch: # watch gradients and params via wandb
+            wandb.watch(self.model, self.criterion, log='all', log_freq=config.batch_size)
 
         # epoch loop
         for epoch in range(config.n_epoch):
@@ -79,6 +82,9 @@ class RunSynthetic:
             self.model.train()
             running_train_loss = 0.0
             running_train_metric = 0.0
+
+            # verbose setting (whether to use tqdm)
+            train_dloader_ = tqdm(self.train_dloader) if self.verbose else self.train_dloader
 
             for input, target in train_dloader_:
                 loss, metric = self.train_eval_batch(input, target)

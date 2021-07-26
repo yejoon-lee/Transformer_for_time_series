@@ -20,7 +20,6 @@ def cut_seq(data,
         window_len: window length
         stride: stride of window
     '''
-
     new_data = []
 
     for i in range(data.shape[0]):
