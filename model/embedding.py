@@ -6,8 +6,11 @@ import math
     
 class WavenetTSEmbedding(nn.Module):
     '''
-    Wavenet-style embedding for time series value.
+    Wavenet-style embedding(i.e. convolution with dilation) for time series value.
     Convolutions are only applied to the left. (causal convolution)
+
+    Reference:
+    Oord, Aaron van den, et al. "Wavenet: A generative model for raw audio." arXiv preprint arXiv:1609.03499 (2016).
     '''
     def __init__(self, embedding_dim, dilation_list = (1,2,4,8), input_channel=1):
         super(WavenetTSEmbedding, self).__init__()

@@ -1,3 +1,8 @@
+'''
+This synthetic dataset setup was suggested in
+Li, Shiyang, et al., “Enhancing the Locality and Breaking the Memory Bottleneck of Transformer on Time Series Forecasting”, NeurIPS, 2019. 
+'''
+
 import numpy as np
 
 def create_multi(sample_num, src_len, tgt_len):

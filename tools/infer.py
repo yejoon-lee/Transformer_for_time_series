@@ -140,8 +140,8 @@ class InferLongTerm(InferShortTerm):
 
         Args:
             input: ((N, S, 1), (N, T, 1))
-            num_draw: Numbers drawing samples from probability distribution when deciding
-            input of t+1_step (scalar) with output of t_step (mean and variance).
+            num_draw: Numbers of simulation in which one scalar value is sampled from output probability
+            distribution and fed as a input of the next step.
         '''
         # unpack input
         src, tgt = input  # (N, S, 1), (N, T, 1)
