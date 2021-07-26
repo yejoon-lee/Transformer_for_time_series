@@ -1,4 +1,5 @@
 import seaborn as sns
+from torch._C import device
 sns.set_style('darkgrid')
 import numpy as np
 import torch
@@ -29,13 +30,18 @@ class InferShortTerm:
              input : tuple, 
              target : torch.Tensor, 
              criterion : nn.modules = nn.GaussianNLLLoss(), 
-             metric_func : nn.modules = nn.L1Loss()):
-        '''Evaluate loss(GaussianNLL by default) and metric(MAE by default)
+             metric_funcs : list = [nn.L1Loss()]):
+        '''Evaluate loss(GaussianNLL by default) and metrics given by list
         Args:
             input: ((N, S, 1), (N, T, 1))
             target: (N, T, 1)
-            criterion: loss function for eval
-            metric: supplementary metric function for eval
+            criterion: loss function.
+            criterion shouldb return value with __call__, receiving mean, target, and var as arguments.
+            Default is nn.GaussianNLLLoss(), and changing this arg would be unnecessary for most of the times.
+
+            metrics: list made up of supplementary metric functions. 
+            Each function should return value with __call__, receiving mean and target as arguments.
+            Defualt is a list of which length is 1, consisting nn.L1Loss().
 
         Help:
             1. input and target should be torch.Tensor whose device is same to self.model
@@ -43,9 +49,12 @@ class InferShortTerm:
         '''
         mean, var= self.forward(input) # (N, T, 1), (N, T, 1)
         loss = criterion(mean, target, var)
-        metric = metric_func(mean, target)
 
-        return loss, metric
+        metrics = torch.zeros(len(metric_funcs))
+        for i, metric_func in enumerate(metric_funcs):
+            metrics[i] = metric_func(mean, target)
+
+        return loss, metrics
     
     def plot(self, 
              input : tuple, 
@@ -83,8 +92,7 @@ class InferShortTerm:
         # ground truth
         truth = np.concatenate((src, target), axis=1) # (N, S+T, 1)
         # cut head to enhance visibility
-        self.x_axis = self.x_axis[cut_head:]
-        truth = truth[cut_head:]
+        self.x_axis = self.x_axis[cut_head:] 
 
         # draw samples & plot
         for i, ax in enumerate(axes):
@@ -92,6 +100,9 @@ class InferShortTerm:
             truth_sampled = truth[i].squeeze(-1) # (S+T, )
             mean_sampled = mean[i].squeeze(-1) # (T, )
             var_sampled = var[i].squeeze(-1) # (T, )
+
+            # cut head to enhance visibility
+            truth_sampled = truth_sampled[cut_head:]
 
             self._plot_single(truth_sampled, mean_sampled, var_sampled, ax)
 
