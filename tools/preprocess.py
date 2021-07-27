@@ -29,18 +29,3 @@ def cut_seq(data,
             new_data.append(data[i, j*stride: j*stride + window_len, ...])
 
     return np.stack(new_data, axis=0)
-
-
-def to_return(array):  # (N, seq_len, 1)
-    '''
-    Make an array of return defined by log.
-    '''
-    all_returns = []
-    for i in range(array.shape[0]):
-        returns = []
-        for j in range(array.shape[1] - 1):
-            return_ = np.log(array[i, j+1, :] / array[i, j, :])
-            returns.append(return_)
-        all_returns.append(returns)
-
-    return np.stack(all_returns, axis=0)
