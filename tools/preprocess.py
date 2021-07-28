@@ -1,11 +1,26 @@
 import numpy as np
 
-def make_input_target(data, src_len, tgt_len): # data: (N, src_len + tgt_len, ...)
+def make_input_target(data, 
+                      src_len : int, 
+                      tgt_len : int): 
+    '''Make data(seq) into input(src and tgt combined) and target. 
+    Only suitable for encoder-decoder structure.
+
+    data: (N, src_len + tgt_len, ...)
+    '''
     assert data.shape[1] == src_len + tgt_len, "seq_len == src_len + tgt_len should be satisfied. seq_len is expected to be axis=1"
     return data[:, :-1, ...], data[:, -tgt_len:, ...] # input: (N, seq_Len-1, ...), target: (N, tgt_Len, ...)
 
 
-def make_src_tgt(input, src_len, tgt_len):
+def make_src_tgt(input, 
+                 src_len : int, 
+                tgt_len : int): 
+    '''Make input(seq) into src(input of encoder) and tgt(input of decoder).
+    Only sutiable for encoder-decoder structure.
+    Ideally, arg 'input' should be first value returned by make_input_target (i.e. make_input_target(args)[0])
+
+    input: (N, src_len + tgt_len - 1, ...)
+    '''
     assert input.shape[1] == src_len + tgt_len - 1, "seq_len == src_len + tgt_len - 1 should be satisfied. seq_len is expected to be axis=1"
     return input[:, :src_len, ...], input[:, src_len-1:, ...]  # src: (N, S, ...), tgt: (N, T, 1)
 

@@ -1,6 +1,3 @@
-import seaborn as sns
-from torch._C import device
-sns.set_style('darkgrid')
 import numpy as np
 import torch
 import torch.nn as nn
@@ -36,7 +33,7 @@ class InferShortTerm:
             input: ((N, S, 1), (N, T, 1))
             target: (N, T, 1)
             criterion: loss function.
-            criterion shouldb return value with __call__, receiving mean, target, and var as arguments.
+            criterion should return value with __call__, receiving mean, target, and var as arguments.
             Default is nn.GaussianNLLLoss(), and changing this arg would be unnecessary for most of the times.
 
             metrics: list made up of supplementary metric functions. 
@@ -69,7 +66,7 @@ class InferShortTerm:
             target: (N, T, 1)
             axes: axes.size should be (*, 1) (i.e. single column)
             cut_head: Cut head of the x axis to enhance visibility
-            quantile: Quantile to be shown in plot
+            quantile: Quantile to be shown as a shaded area
             num_draw: Numbers drawing samples from probability distribution
 
         Help:
@@ -161,11 +158,11 @@ class InferLongTerm(InferShortTerm):
                 mean = output_mean[:, j, :] # (N, 1)
                 var = output_var[:, j, :] # (N, 1)
 
-                # append in final forecast value
+                # append to final forecast value
                 drawn_mean[i ,:, j, :] = mean
                 drawn_var[i, :, j, :] = var
 
-                # sample from given distribution and append in tgt; not executed in last iter
+                # sample from given distribution(output) and append to tgt(next input); not executed in last iter
                 if j < tgt.shape[1] - 1:
                     sampled_ts = torch.normal(mean, var) # (N, 1)
                     tgt[:, j+1, :] = sampled_ts
