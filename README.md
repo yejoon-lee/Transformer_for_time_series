@@ -1,5 +1,5 @@
 # Transformer_for_time_series
-Transformer for time series forecasting; 2021 Summer
+Project done in SNU class, Field Application of IoT, AI, Big Data 1, in 2021 Summer.
 
 ## Dataset
 > Synthetic dataset  
