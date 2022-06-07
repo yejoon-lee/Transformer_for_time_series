@@ -21,7 +21,7 @@ idna==3.2
 importlib-metadata==3.10.0
 ipykernel==5.5.5
 ipython-genutils==0.2.0
-ipython==7.25.0
+ipython==7.31.1
 jedi==0.18.0
 jinja2==3.0.1
 joblib==1.0.1
